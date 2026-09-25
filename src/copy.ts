@@ -45,10 +45,13 @@ export const COPY = {
     buyTabs: { now: 'Buy now', monthly: 'Every month', price: 'At my price' },
     sellTabs: { now: 'Sell now', price: 'At my price' },
     reservedTitle: (g: number) => `${grams(g)} is already in other price orders`,
-    reservedBodyNow: (avail: number) =>
-      `Selling more than ${grams(avail)} now will cancel some of those orders.`,
     reservedBodyPrice: (avail: number) => `You can place sell orders for up to ${grams(avail)}.`,
     reservedCta: (h: number) => `Cancel them and sell all ${grams(h)}`,
+    pendingCancel: (n: number) => `${n} price order${n === 1 ? '' : 's'} will be cancelled when you confirm`,
+    pendingBody: 'Nothing is cancelled yet. If you go back or change your mind, they stay open.',
+    keepThem: (avail: number) => `Keep them and sell ${grams(avail)} instead`,
+    lifoNote: (g: number, n: number) => `Selling ${grams(g)} will cancel ${n} price order${n === 1 ? '' : 's'}`,
+    receiveApprox: (v: number) => `≈ ${aed(v)}`,
   },
 
   autoInvest: {
@@ -74,7 +77,6 @@ export const COPY = {
     amountLabel: 'How much do you want to spend?',
     gramsLabel: 'How much do you want to sell?',
     approxGrams: (g: number) => `≈ ${grams(g)} at your price`,
-    approxProceeds: (v: number) => `≈ ${aed(v)} at your price`,
     minBuy: `The minimum is ${aed(MIN_BUY_AED, 0)}.`,
     walletHint: (bal: number) =>
       `Your wallet has ${aed(bal)}. We only take the money when your order goes through.`,
@@ -101,7 +103,7 @@ export const COPY = {
       side === 'buy' ? `Price drops to ${price(a, p)}/g` : `Price rises to ${price(a, p)}/g`,
     todaysPrice: "Today's price",
     estGrams: 'You\'ll get about',
-    estProceeds: 'You\'ll receive about',
+    estProceeds: "You'll receive",
     totalAtFill: 'Charged when it goes through',
     disclosures: {
       buffer: (buffer: number, side: Side) =>
@@ -230,7 +232,7 @@ export const COPY = {
     filled: (a: AssetId, side: Side, g: number, p: number) =>
       `${side === 'buy' ? 'Bought' : 'Sold'} ${grams(g)} at ${price(a, p)}/g`,
     cancelled: 'You cancelled this order',
-    cancelledForSell: 'Cancelled so you could sell all your holdings',
+    replacedBy: (id: string) => `Cancelled when you placed ${id} to sell all your holdings`,
     changed: 'Cancelled to set a new price',
     autoCancelled: (g: number) => `Cancelled because you sold manually and now hold ${grams(g)}`,
     expired: 'Reached the end date without filling',
@@ -240,14 +242,18 @@ export const COPY = {
     placedTitle: 'Price order placed',
     placedBody: (side: Side, a: AssetId, p: number, ends: string) =>
       `${side === 'buy' ? 'Buy' : 'Sell'} ${lower(a)} at ${price(a, p)}/g · open until ${ends}`,
-    filledTitle: (side: Side, a: AssetId) => `${label(a)} ${side === 'buy' ? 'bought' : 'sold'} at your price`,
-    filledBody: (a: AssetId, fill: number, limit: number, g: number, total: number, side: Side) =>
-      `Filled at ${price(a, fill)} (your price ${price(a, limit)}). ${grams(g)} · ${aed(total)} ${side === 'buy' ? 'charged' : 'credited'}.`,
+    filledTitle: (side: Side, a: AssetId, fill: number, limit: number) =>
+      `${label(a)} ${side === 'buy' ? 'bought' : 'sold'} at ${price(a, fill)}/g (your price ${price(a, limit)}/g)`,
+    filledBody: (g: number, total: number, side: Side) =>
+      `${grams(g)} · ${aed(total)} ${side === 'buy' ? 'charged' : 'credited to your wallet'}.`,
     failedTitle: (a: AssetId) => `Your ${lower(a)} order couldn't go through`,
     failedBody: (reason: FailReason) => COPY.reasons[reason],
     autoTitle: 'Price order cancelled',
-    autoBody: (a: AssetId, p: number, g: number) =>
-      `Your order to sell ${grams(g)} ${lower(a)} at ${price(a, p)} was cancelled because you sold some ${lower(a)} yourself.`,
+    batchTitle: (n: number) => (n === 1 ? '1 price order cancelled' : `${n} price orders cancelled`),
+    batchReasonAuto: (a: AssetId) => `You sold some ${lower(a)} yourself, so we cancelled the newest sell orders:`,
+    batchReasonReplace: (a: AssetId) => `You chose to sell all your ${lower(a)} in a new price order:`,
+    batchLine: (a: AssetId, g: number, p: number) => `• Sell ${grams(g)} ${lower(a)} at ${price(a, p)}/g`,
+    ctaViewCancelled: 'See cancelled orders',
     expiringTitle: 'Your price order ends soon',
     expiringBody: (side: Side, a: AssetId, p: number) =>
       `Your order to ${side} ${lower(a)} at ${price(a, p)} ends in less than 24 hours.`,

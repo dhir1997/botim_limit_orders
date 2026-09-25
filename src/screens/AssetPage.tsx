@@ -16,6 +16,8 @@ export default function AssetPage() {
   const sell = todayPrice(state, asset, 'sell');
   const m = state.market[asset];
   const change = (buy - m.openBuy) / m.openBuy;
+  // Direction since the app opened drives both the arrow and the sparkline colour.
+  const up = change >= 0;
   const holdings = state.holdings[asset];
   const openCount = state.orders.filter(o => o.asset === asset && (o.status === 'OPEN' || o.status === 'TRIGGERED')).length;
   const unread = state.notifications.filter(n => !n.read).length;
@@ -48,26 +50,23 @@ export default function AssetPage() {
           <AssetCoin asset={asset} size={42} />
         </div>
 
+        {/* Buy and sell carry equal weight — no buy-only hero number. */}
         <section className="card price-card">
-          <p className="price-card__label">{COPY.asset.buyPrice} · {cfg.label} {cfg.purity}</p>
-          <p className="price-card__big">
-            <Flash value={buy}>{price(asset, buy)}</Flash>
-            <span className="price-card__unit">{COPY.asset.perGram}</span>
-          </p>
-          <p className={`price-card__change ${change >= 0 ? 'up' : 'down'}`}>
-            {change >= 0 ? '▲' : '▼'} {pct(change, 2)} <span>{COPY.asset.sinceOpen}</span>
-          </p>
-          <Sparkline data={m.history} height={70} />
-          <div className="price-card__split">
-            <div>
-              <p className="price-card__mini-label">{COPY.asset.buyPrice}</p>
-              <p className="price-card__mini"><Flash value={buy}>{price(asset, buy)}</Flash></p>
+          <p className="price-card__label price-card__meta">{cfg.label} {cfg.purity} · per gram</p>
+          <div className="price-pair">
+            <div className="price-pair__tile">
+              <p className="price-pair__label">{COPY.asset.buyPrice}</p>
+              <p className="price-pair__value"><Flash value={buy}>{price(asset, buy)}</Flash><small>{COPY.asset.perGram}</small></p>
             </div>
-            <div>
-              <p className="price-card__mini-label">{COPY.asset.sellPrice}</p>
-              <p className="price-card__mini"><Flash value={sell}>{price(asset, sell)}</Flash></p>
+            <div className="price-pair__tile">
+              <p className="price-pair__label">{COPY.asset.sellPrice}</p>
+              <p className="price-pair__value"><Flash value={sell}>{price(asset, sell)}</Flash><small>{COPY.asset.perGram}</small></p>
             </div>
           </div>
+          <p className={`price-card__change ${up ? 'up' : 'down'}`}>
+            {up ? '▲' : '▼'} {pct(change, 2)} <span>{COPY.asset.sinceOpen}</span>
+          </p>
+          <Sparkline data={m.history} height={70} trend={up ? 'up' : 'down'} />
         </section>
 
         <section className="card holdings-strip">

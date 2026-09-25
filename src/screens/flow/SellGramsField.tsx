@@ -1,52 +1,66 @@
-// Grams input shared by "Sell now" and "At my price" (sell).
-// % chips are a share of TOTAL holdings. If the grams asked for exceed what's
-// free (holdings minus open sell orders), an inline card offers to cancel
-// those orders and sell everything.
+// Grams input shared by "Sell now" and "At my price" (sell). % chips are a
+// share of TOTAL holdings.
+//
+// "Sell now": if the sale leaves too little for open sell orders, an inline
+//   note says how many will be cancelled (newest first); the flow confirms with
+//   a warning sheet before selling.
+// "At my price": if the grams exceed what's free, a card offers "Cancel them
+//   and sell all". Tapping it cancels NOTHING — it sets full holdings and stages
+//   the cancellation, which only happens when the order is placed.
 
-import type { ReactNode } from 'react';
-import { GRAM_DECIMALS, SELL_PCT_CHIPS, type AssetId } from '../../config';
+import { FEE_AED, GRAM_DECIMALS, SELL_PCT_CHIPS, type AssetId } from '../../config';
 import { COPY } from '../../copy';
 import { Alert } from '../../components/Icons';
-import { reservedSellGrams } from '../../engine/ledger';
-import { floorTo, grams, parseNum } from '../../lib/format';
+import { previewAutoCancels, reservedSellGrams } from '../../engine/ledger';
+import { aed, floorTo, grams, parseNum } from '../../lib/format';
 import { useStore } from '../../store/StoreProvider';
 
 const EPS = 1e-9;
-
-export function sellFieldState(holdings: number, reserved: number, g: number) {
-  const available = Math.max(holdings - reserved, 0);
-  return {
-    available,
-    overHoldings: Number.isFinite(g) && g > holdings + EPS,
-    overAvailable: Number.isFinite(g) && g > available + EPS && g <= holdings + EPS && reserved > EPS,
-  };
-}
 
 export default function SellGramsField({
   asset,
   value,
   onChange,
   mode,
-  hint,
+  replaceOthers = false,
+  onReplaceOthers,
+  estimatePrice,
 }: {
   asset: AssetId;
   value: string;
   onChange: (v: string) => void;
   mode: 'now' | 'price';
-  /** Shown under the field when there's nothing to warn about (e.g. estimated proceeds). */
-  hint?: ReactNode;
+  /** "At my price": the user chose to replace their other sell orders on placement. */
+  replaceOthers?: boolean;
+  onReplaceOthers?: (on: boolean) => void;
+  /** "At my price": the user's price, for the receive estimate. */
+  estimatePrice?: number;
 }) {
-  const { state, dispatch } = useStore();
+  const { state } = useStore();
   const holdings = state.holdings[asset];
+  const openSells = state.orders.filter(o => o.asset === asset && o.side === 'sell' && o.status === 'OPEN');
   const reserved = reservedSellGrams(state, asset);
+  const available = Math.max(holdings - reserved, 0);
   const g = parseNum(value);
-  const { available, overHoldings, overAvailable } = sellFieldState(holdings, reserved, g);
+  const hasGrams = Number.isFinite(g) && g > 0;
+  const overHoldings = hasGrams && g > holdings + EPS;
+  const overAvailable = hasGrams && !overHoldings && g > available + EPS && reserved > EPS;
+  const willCancel = mode === 'now' && hasGrams && !overHoldings ? previewAutoCancels(state, asset, holdings - g) : [];
   const chipGrams = (p: number) => floorTo((holdings * p) / 100, GRAM_DECIMALS);
 
-  const cancelAndSellAll = () => {
-    dispatch({ type: 'CANCEL_SELL_ORDERS', asset, realNow: Date.now() });
-    onChange(String(floorTo(holdings, GRAM_DECIMALS)));
+  // Any manual change un-stages the replacement; the card shows again if still needed.
+  const set = (v: string) => {
+    onChange(v);
+    if (replaceOthers) onReplaceOthers?.(false);
   };
+  const stageReplace = () => {
+    onChange(String(floorTo(holdings, GRAM_DECIMALS)));
+    onReplaceOthers?.(true);
+  };
+
+  const pending = mode === 'price' && replaceOthers && openSells.length > 0;
+  const blocked = mode === 'price' && overAvailable && !replaceOthers;
+  const showEstimate = mode === 'price' && hasGrams && !overHoldings && !blocked && !!estimatePrice && estimatePrice > 0;
 
   return (
     <section className="card field-card">
@@ -56,7 +70,7 @@ export default function SellGramsField({
           inputMode="decimal"
           placeholder="0.0000"
           value={value}
-          onChange={e => onChange(e.target.value.replace(/[^0-9.]/g, ''))}
+          onChange={e => set(e.target.value.replace(/[^0-9.]/g, ''))}
           aria-label="Grams to sell"
         />
         <span className="amount-input__suffix">g</span>
@@ -65,9 +79,9 @@ export default function SellGramsField({
         {SELL_PCT_CHIPS.map(p => (
           <button
             key={p}
-            className={`chip-btn${g > 0 && g === chipGrams(p) ? ' active' : ''}`}
+            className={`chip-btn${hasGrams && g === chipGrams(p) ? ' active' : ''}`}
             disabled={holdings <= 0}
-            onClick={() => onChange(String(chipGrams(p)))}
+            onClick={() => set(String(chipGrams(p)))}
           >
             {p}%
           </button>
@@ -79,22 +93,42 @@ export default function SellGramsField({
       </p>
 
       {overHoldings && <p className="field-card__hint bad">{COPY.marketSell.tooMuch(holdings)}</p>}
-      {mode === 'price' && value !== '' && !(g > 0) && <p className="field-card__hint bad">{COPY.ticket.gramsMissing}</p>}
+      {mode === 'price' && value !== '' && !hasGrams && <p className="field-card__hint bad">{COPY.ticket.gramsMissing}</p>}
 
-      {hint && !overHoldings && !overAvailable && <p className="field-card__hint">{hint}</p>}
+      {willCancel.length > 0 && (
+        <p className="note note--amber"><Alert size={14} /> {COPY.flow.lifoNote(g, willCancel.length)}</p>
+      )}
 
-      {overAvailable && (
+      {blocked && (
         <div className="reserved-card">
           <div className="reserved-card__head">
             <Alert size={18} />
             <p className="reserved-card__title">{COPY.flow.reservedTitle(reserved)}</p>
           </div>
-          <p className="reserved-card__body">
-            {mode === 'now' ? COPY.flow.reservedBodyNow(available) : COPY.flow.reservedBodyPrice(available)}
-          </p>
-          <button className="btn btn-outline btn-sm reserved-card__btn" onClick={cancelAndSellAll}>
+          <p className="reserved-card__body">{COPY.flow.reservedBodyPrice(available)}</p>
+          <button className="btn btn-outline btn-sm reserved-card__btn" onClick={stageReplace}>
             {COPY.flow.reservedCta(holdings)}
           </button>
+        </div>
+      )}
+
+      {pending && (
+        <div className="pending-note">
+          <p className="pending-note__title">{COPY.flow.pendingCancel(openSells.length)}</p>
+          <p className="pending-note__body">{COPY.flow.pendingBody}</p>
+          <button className="link-btn" onClick={() => set(String(floorTo(available, GRAM_DECIMALS)))}>
+            {COPY.flow.keepThem(available)}
+          </button>
+        </div>
+      )}
+
+      {showEstimate && (
+        <div className="estimate">
+          <div className="estimate__row"><span>{COPY.ticket.fee}</span><span>{aed(FEE_AED)}</span></div>
+          <div className="estimate__row estimate__row--total">
+            <span>{COPY.marketSell.receive}</span>
+            <span>{COPY.flow.receiveApprox(g * estimatePrice! - FEE_AED)}</span>
+          </div>
         </div>
       )}
     </section>

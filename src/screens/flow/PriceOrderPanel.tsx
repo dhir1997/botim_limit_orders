@@ -8,6 +8,7 @@ import {
   DAY_MS,
   DEFAULT_PRICE_OFFSET,
   DEFAULT_VALIDITY_DAYS,
+  FEE_AED,
   GRAM_DECIMALS,
   PRICE_STEP_PCT,
   VALIDITY_OPTIONS,
@@ -54,11 +55,13 @@ export default function PriceOrderPanel({
   const [gramsStr, setGramsStr] = useState(prefill.grams ? String(prefill.grams) : '');
   const [validity, setValidity] = useState<number>(prefill.validityDays ?? DEFAULT_VALIDITY_DAYS);
   const [touched, setTouched] = useState(false);
+  /** "Cancel them and sell all" staged — applied only when the order is placed. */
+  const [replaceOthers, setReplaceOthers] = useState(false);
 
   const limitPrice = parseNum(priceStr);
   const amountAed = parseNum(amountStr);
   const g = parseNum(gramsStr);
-  const v = validateTicket(state, { asset, side, limitPrice, amountAed, grams: g });
+  const v = validateTicket(state, { asset, side, limitPrice, amountAed, grams: g, replaceSellOrders: side === 'sell' && replaceOthers });
   const endsAt = now + validity * DAY_MS;
   const showPriceError = v.priceError && (touched || v.showMarketLink);
 
@@ -80,6 +83,7 @@ export default function PriceOrderPanel({
         amountAed: side === 'buy' ? amountAed : undefined,
         grams: side === 'sell' ? floorTo(g, GRAM_DECIMALS) : undefined,
         validityDays: validity,
+        replaceSellOrders: side === 'sell' && replaceOthers ? true : undefined,
       },
     });
   };
@@ -172,7 +176,9 @@ export default function PriceOrderPanel({
           value={gramsStr}
           onChange={setGramsStr}
           mode="price"
-          hint={!v.gramsError && g > 0 && limitPrice > 0 ? COPY.ticket.approxProceeds(g * limitPrice) : undefined}
+          replaceOthers={replaceOthers}
+          onReplaceOthers={setReplaceOthers}
+          estimatePrice={Number.isFinite(limitPrice) ? limitPrice : undefined}
         />
       )}
 
@@ -198,6 +204,9 @@ export default function PriceOrderPanel({
           value={side === 'buy' ? (Number.isFinite(amountAed) ? aed(amountAed) : '—') : g > 0 ? grams(g) : '—'}
         />
         <Row label={COPY.ticket.fee} value={COPY.ticket.feeValue} />
+        {side === 'sell' && g > 0 && limitPrice > 0 && (
+          <Row label={COPY.marketSell.receive} value={COPY.flow.receiveApprox(g * limitPrice - FEE_AED)} strong />
+        )}
         <Row label={COPY.ticket.ends} value={fmtDate(endsAt)} />
       </section>
     </FlowPanel>

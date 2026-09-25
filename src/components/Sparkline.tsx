@@ -4,9 +4,11 @@ interface Props {
   height?: number;
   /** Optional horizontal marker, e.g. the user's price. */
   marker?: number;
+  /** Colour direction. Defaults to first-vs-last point of `data`. */
+  trend?: 'up' | 'down';
 }
 
-export default function Sparkline({ data, width = 320, height = 72, marker }: Props) {
+export default function Sparkline({ data, width = 320, height = 72, marker, trend }: Props) {
   const values = marker !== undefined ? [...data, marker] : data;
   const min = Math.min(...values);
   const max = Math.max(...values);
@@ -14,7 +16,7 @@ export default function Sparkline({ data, width = 320, height = 72, marker }: Pr
   const pad = 6;
   const x = (i: number) => (i / Math.max(data.length - 1, 1)) * width;
   const y = (v: number) => pad + (1 - (v - min) / range) * (height - pad * 2);
-  const up = data[data.length - 1] >= data[0];
+  const up = trend ? trend === 'up' : data[data.length - 1] >= data[0];
   const stroke = up ? 'var(--green)' : 'var(--red)';
   const line = data.map((v, i) => `${i === 0 ? 'M' : 'L'}${x(i).toFixed(1)},${y(v).toFixed(1)}`).join(' ');
   const area = `${line} L${width},${height} L0,${height} Z`;

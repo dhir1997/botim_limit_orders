@@ -25,7 +25,11 @@ export default function ReviewOrder({ draft }: { draft: TicketDraft }) {
     limitPrice: draft.limitPrice,
     amountAed: draft.amountAed ?? NaN,
     grams: draft.grams ?? NaN,
+    replaceSellOrders: draft.replaceSellOrders,
   });
+  const toCancel = draft.replaceSellOrders
+    ? state.orders.filter(o => o.asset === asset && o.side === 'sell' && o.status === 'OPEN')
+    : [];
 
   const submit = () => {
     if (!v.ok) {
@@ -66,11 +70,20 @@ export default function ReviewOrder({ draft }: { draft: TicketDraft }) {
           <>
             <Row label={COPY.ticket.amount} value={grams(draft.grams!)} />
             <Row label={COPY.ticket.fee} value={aed(FEE_AED)} />
-            <Row label={COPY.review.estProceeds} value={aed(draft.grams! * draft.limitPrice - FEE_AED)} strong />
+            <Row label={COPY.review.estProceeds} value={COPY.flow.receiveApprox(draft.grams! * draft.limitPrice - FEE_AED)} strong />
           </>
         )}
         <Row label={COPY.ticket.ends} value={fmtDate(now + draft.validityDays * DAY_MS)} />
       </section>
+
+      {toCancel.length > 0 && (
+        <div className="pending-note">
+          <p className="pending-note__title">{COPY.flow.pendingCancel(toCancel.length)}</p>
+          {toCancel.map(o => (
+            <p key={o.id} className="pending-note__body">{COPY.notif.batchLine(o.asset, o.grams ?? 0, o.limitPrice)}</p>
+          ))}
+        </div>
+      )}
 
       {(stale || !v.ok) && (
         <div className="inline-error inline-error--box">

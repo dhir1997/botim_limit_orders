@@ -9,7 +9,7 @@ Structure and visual language follow `../botim_physical_delivery`: the phone she
 ```bash
 npm install
 npm run dev        # http://localhost:5173
-npm test           # headless checks of the order engine (31 checks)
+npm test           # headless checks of the order engine
 npm run build      # typecheck + production build
 ```
 
@@ -24,7 +24,8 @@ npm run build      # typecheck + production build
 | Order | Triggered orders are processed oldest first. Wallet balance and holdings update after each fill. |
 | Payment | One debit attempt of amount + AED 1. Insufficient wallet balance or a forced card decline makes the order FAILED (terminal). |
 | Sell cap | Grams in open sell orders plus the new order must be ≤ holdings. |
-| Holdings drop | After a manual sell (or a demo holdings change), the **newest** open sell orders are cancelled first until they fit. Each becomes AUTO_CANCELLED and sends a notification. |
+| Holdings drop | After a manual sell (or a demo holdings change), the **newest** open sell orders are cancelled first until they fit. Each becomes AUTO_CANCELLED. |
+| Cancellation notices | All orders cancelled by one user action produce **one** toast and inbox item ("{n} price orders cancelled") that lists each order. |
 | Expiry | An OPEN order past its validity becomes EXPIRED. The "ends in 24h" notice is sent once, and is skipped for orders placed less than an hour ago. |
 | Fill record | Each fill stores the fill price, your price, and slippage in AED and bps. These show in the event log and the order detail. |
 
@@ -72,7 +73,11 @@ Price orders are not a separate flow. They live as a tab inside the normal Buy a
 - Each tab keeps its own values. Switching tabs, or going back from Review, doesn't wipe what was entered.
 - The asset page's **Set a price** promo card opens the Buy flow with **At my price** selected. The Buy and Sell buttons open their flows on the "now" tab.
 - On "At my price", a price on the wrong side of today's price shows **Buy/Sell now at today's price**. That link switches to the "now" tab and carries the amount over.
-- **Sell % chips are a share of total holdings.** If the grams chosen exceed what's free (holdings minus open sell orders), an inline card says "{x} g is already in other price orders" and offers **Cancel them and sell all {holdings} g**. Tapping it cancels those orders, sends a notification for each, and sets the amount to full holdings. This works the same on both sell tabs.
+- **Sell % chips are a share of total holdings** on both sell tabs.
+- **At my price (sell):** if the grams chosen exceed what's free (holdings minus open sell orders), an inline card says "{x} g is already in other price orders" and offers **Cancel them and sell all {holdings} g**. Tapping it **cancels nothing**. It sets the amount to full holdings and shows "{n} price orders will be cancelled when you confirm", which Review repeats. The cancellation runs only when the order is placed. Backing out leaves them open.
+- **Sell now:** no card. If the sale leaves too little for open sell orders, an inline note says "Selling {x} g will cancel {n} price orders". Confirming opens the warning sheet, and orders are cancelled newest first.
+- **Sell estimates** (both tabs and Review) show a fee line and "You'll receive ≈ AED {grams × price − 1}".
+- **Asset page:** buy and sell prices get equal weight. The sparkline colour follows the "since you opened the app" change.
 
 Other screens: asset page (Gold/Silver tabs, live prices, sparkline, "Price orders (n)"), Price orders (Open / History), Order detail (timeline, cancel, change price), Market result, Inbox, Portfolio. Every new notification also appears as a toast banner.
 
@@ -89,7 +94,7 @@ Controls are in the **Demo controls** panel to the right of the phone. Scenario 
 | 5 | **Buy price above today's price** blocked, with a "Buy now at today's price" link that switches to the Buy now tab with the amount carried over | Buy → At my price → type a price above today's buy price (or press + repeatedly) |
 | 6 | **Sell price below today's price** blocked, with a "Sell now at today's price" link | Sell → At my price → type a price below today's sell price |
 | 7 | **Sell cap** → inline card "{x} g is already in other price orders" + "You can place sell orders for up to X g" | Place a sell for 1.5 g gold, then Sell → At my price → enter more than 0.5 g (or tap 100%) |
-| 7b | **Cancel them and sell all** → those orders CANCELLED (one notification each), amount set to full holdings | From #7 (or #14), tap **Cancel them and sell all {holdings} g**. Works on both Sell now and At my price. |
+| 7b | **Cancel them and sell all** is staged, not immediate | From #7, tap **Cancel them and sell all {holdings} g**. Nothing is cancelled (check the event log). A pending note appears, and Review repeats it. Back out, and Price orders still shows them open. Place the order, and they're CANCELLED in one batched "{n} price orders cancelled" notification. |
 | 7c | **Tab values persist** | Buy → type an amount on Buy now → switch to At my price, change things → switch back. Both tabs keep their values, and so does Back from Review. |
 | 8 | **Min buy AED 10** | Buy → At my price → amount 5 |
 | 9 | **Buy fills** (with a better price if the market moved past you) → FILLED + notification → View portfolio | Place a buy, then press the asset's **−1%** / **−5%** until the buy price is ≤ your price. It fills on the next check. |
@@ -97,7 +102,7 @@ Controls are in the **Demo controls** panel to the right of the phone. Scenario 
 | 11 | **Oldest first: 2 buys at the same price, wallet covers only one** → oldest FILLED, second FAILED ("not enough balance") → *Buy now at today's price* (prefilled market buy) | Preset **"2 buys, same price, wallet covers 1"**, then press Gold **−1%** |
 | 12 | **Buffer miss** → TRIGGERED → OPEN, "price moved, still waiting" in the log | Place an order, set **Exec jitter** above the buffer (e.g. ±1%), tick **Jitter always against user**, then press **⌖ Move price to newest order**. On the next check the log shows `TRIGGER`, then `miss`. |
 | 13 | **Card payment declined at fill** → FAILED ("card was declined") | Place a card buy (#2), tick **Force next card payment to decline**, then move the price onto it (#9) |
-| 14 | **Manual sell cancels newest sell orders first** → warning sheet, then AUTO_CANCELLED + notifications | Preset **"Manual sell cancels newest sell orders"** (3 × 0.5 g sell orders; Sell flow opens with 1.2 g). The reserved-orders card is shown. Tap **Sell now** → **Sell and cancel orders**. |
+| 14 | **Manual sell cancels newest sell orders first** → inline note, warning sheet, then AUTO_CANCELLED + one batched notification | Preset **"Manual sell cancels newest sell orders"** (3 × 0.5 g sell orders; Sell flow opens with 1.2 g). The note reads "Selling 1.2000 g will cancel 2 price orders". Tap **Sell now** → **Sell and cancel orders**. |
 | 15 | **Holdings drop from outside** → auto-cancel, newest first | Place sell orders, then lower **Holdings** in the panel |
 | 16 | **Ends-in-24h notice** (sent once) → View order | Preset **"Order about to expire"**, then wait for the next check (~5s) |
 | 17 | **Expired** → EXPIRED + "Set a new price" | After #16, press **Fast-forward +1 hour** (or place any order and use +1 / +7 / +30 days) |

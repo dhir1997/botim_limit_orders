@@ -64,7 +64,7 @@ export default function SellNowPanel({ asset, hidden, grams: prefill, seed }: { 
         <section className="card card-p">
           <Row label={COPY.ticket.amount} value={grams(g)} />
           <Row label={COPY.marketSell.fee} value={aed(FEE_AED)} />
-          <Row label={COPY.marketSell.receive} value={aed(g * sell - FEE_AED)} strong />
+          <Row label={COPY.marketSell.receive} value={COPY.flow.receiveApprox(g * sell - FEE_AED)} strong />
         </section>
       )}
 

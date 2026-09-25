@@ -5,7 +5,7 @@
 
 import { ASSETS, DAY_MS, FEE_AED, SPARKLINE_POINTS, type AssetId } from '../config';
 import { COPY } from '../copy';
-import { findOrder, log, move, notify, notifyPlaced, reconcileSellCap, roundPrice, sweepExpiry, todayPrice, type Ctx } from '../engine/ledger';
+import { findOrder, log, move, notify, notifyCancelledBatch, notifyPlaced, reconcileSellCap, roundPrice, sweepExpiry, todayPrice, type Ctx } from '../engine/ledger';
 import { customerBuyPrice, stepMid } from '../engine/priceEngine';
 import { runPollTick } from '../engine/triggerEngine';
 import { validateTicket } from '../engine/validation';
@@ -31,8 +31,6 @@ export type Action =
   | { type: 'PLACE_ORDER'; orderId: string; draft: TicketDraft; realNow: number }
   | { type: 'CARD_AUTH_RESULT'; orderId: string; realNow: number }
   | { type: 'CANCEL_ORDER'; orderId: string; reason: 'user' | 'change'; realNow: number }
-  /** "Cancel them and sell all": cancels every open sell order for the asset. */
-  | { type: 'CANCEL_SELL_ORDERS'; asset: AssetId; realNow: number }
   | { type: 'MARKET_SELL'; tradeId: string; asset: AssetId; grams: number; realNow: number }
   | { type: 'MARKET_BUY'; tradeId: string; asset: AssetId; amountAed: number; method: PaymentMethod; realNow: number }
   | { type: 'MARK_ALL_READ' }
@@ -122,10 +120,20 @@ export function reducer(state: AppState, action: Action): AppState {
         limitPrice: d.limitPrice,
         amountAed: d.amountAed ?? NaN,
         grams: d.grams ?? NaN,
+        replaceSellOrders: d.replaceSellOrders,
       });
       if (!v.ok) {
         log(ctx, 'demo', `Placement rejected: ${v.priceError ?? v.amountError ?? v.gramsError}`);
         return ctx.s;
+      }
+      // "Cancel them and sell all": the other sell orders go only now, on placement.
+      if (d.side === 'sell' && d.replaceSellOrders) {
+        const others = ctx.s.orders.filter(o => o.asset === d.asset && o.side === 'sell' && o.status === 'OPEN');
+        for (const o of others) {
+          const note = COPY.timeline.replacedBy(action.orderId);
+          move(ctx, o.id, 'CANCELLED', note, { cancelReason: note });
+        }
+        notifyCancelledBatch(ctx, d.asset, others.map(o => o.id), 'replace');
       }
       const order = createOrder(ctx, action.orderId, d, ctx.now);
       if (order.side === 'buy' && order.paymentMethod === 'card') {
@@ -159,25 +167,6 @@ export function reducer(state: AppState, action: Action): AppState {
       if (!o || o.status !== 'OPEN') return state;
       const note = action.reason === 'change' ? COPY.timeline.changed : COPY.timeline.cancelled;
       move(ctx, o.id, 'CANCELLED', note, { cancelReason: note });
-      return ctx.s;
-    }
-
-    case 'CANCEL_SELL_ORDERS': {
-      const ctx = begin(state, action.realNow);
-      const open = ctx.s.orders.filter(o => o.asset === action.asset && o.side === 'sell' && o.status === 'OPEN');
-      if (open.length === 0) return state;
-      for (const o of open) {
-        move(ctx, o.id, 'CANCELLED', COPY.timeline.cancelledForSell, { cancelReason: COPY.timeline.cancelledForSell });
-        notify(ctx, {
-          kind: 'cancelled',
-          title: COPY.notif.cancelledTitle,
-          body: COPY.notif.cancelledBody('sell', o.asset, o.limitPrice),
-          asset: o.asset,
-          orderId: o.id,
-          cta: { type: 'set_price', asset: o.asset, side: 'sell', label: COPY.notif.ctaSetPrice },
-        });
-      }
-      log(ctx, 'demo', `User cancelled ${open.length} sell order(s) to sell all ${action.asset}`);
       return ctx.s;
     }
 

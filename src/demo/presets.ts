@@ -65,7 +65,7 @@ export const PRESETS: Preset[] = [
         })),
       });
       dispatch({ type: 'DEMO_LOG', msg: `Preset: LIFO — sell orders ${ids.join(', ')} (oldest → newest)`, realNow: now() });
-      dispatch({ type: 'DEMO_HINT', hint: `Sell flow is open with 1.2 g. Tap "Sell now": the warning lists ${ids[2]} and ${ids[1]}; ${ids[0]} stays open. Or tap 100% → "Cancel them and sell all 2 g".` });
+      dispatch({ type: 'DEMO_HINT', hint: `Sell flow is open with 1.2 g. Tap "Sell now": the warning lists ${ids[2]} and ${ids[1]}; ${ids[0]} stays open. On "At my price", 100% → "Cancel them and sell all" stages the cancellation until you place the order.` });
       setAsset('gold');
       reset('asset', { name: 'sell', asset: 'gold', grams: 1.2 });
     },

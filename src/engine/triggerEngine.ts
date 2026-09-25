@@ -142,8 +142,8 @@ function executeBuy(ctx: Ctx, o: Order, fillPrice: number): void {
   logFill(ctx, o, fill, total);
   notify(ctx, {
     kind: 'filled',
-    title: COPY.notif.filledTitle('buy', o.asset),
-    body: COPY.notif.filledBody(o.asset, fillPrice, o.limitPrice, grams, total, 'buy'),
+    title: COPY.notif.filledTitle('buy', o.asset, fillPrice, o.limitPrice),
+    body: COPY.notif.filledBody(grams, total, 'buy'),
     asset: o.asset,
     orderId: o.id,
     cta: { type: 'view_portfolio', label: COPY.notif.ctaPortfolio },
@@ -165,8 +165,8 @@ function executeSell(ctx: Ctx, o: Order, fillPrice: number): void {
   logFill(ctx, o, fill, proceeds - FEE_AED);
   notify(ctx, {
     kind: 'filled',
-    title: COPY.notif.filledTitle('sell', o.asset),
-    body: COPY.notif.filledBody(o.asset, fillPrice, o.limitPrice, grams, proceeds - FEE_AED, 'sell'),
+    title: COPY.notif.filledTitle('sell', o.asset, fillPrice, o.limitPrice),
+    body: COPY.notif.filledBody(grams, proceeds - FEE_AED, 'sell'),
     asset: o.asset,
     orderId: o.id,
     cta: { type: 'view_portfolio', label: COPY.notif.ctaPortfolio },

@@ -13,6 +13,8 @@ export interface TicketInput {
   limitPrice: number; // NaN when empty
   amountAed: number; // NaN when empty (buy)
   grams: number; // NaN when empty (sell)
+  /** Sell: open sell orders will be cancelled on placement, so they don't reserve holdings. */
+  replaceSellOrders?: boolean;
 }
 
 export interface TicketValidation {
@@ -33,7 +35,7 @@ const EPS = 1e-9;
 
 export function validateTicket(s: AppState, t: TicketInput): TicketValidation {
   const today = todayPrice(s, t.asset, t.side);
-  const sellReserved = reservedSellGrams(s, t.asset);
+  const sellReserved = t.side === 'sell' && t.replaceSellOrders ? 0 : reservedSellGrams(s, t.asset);
   const sellAvailable = Math.max(s.holdings[t.asset] - sellReserved, 0);
   const res: TicketValidation = { ok: true, today, distance: 0, sellAvailable, sellReserved };
 

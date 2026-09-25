@@ -67,6 +67,8 @@ export interface TicketDraft {
   grams?: number;
   validityDays: number;
   paymentMethod?: PaymentMethod;
+  /** Sell only: cancel every open sell order for this asset when (and only when) this order is placed. */
+  replaceSellOrders?: boolean;
 }
 
 export type NotificationKind =
@@ -83,7 +85,8 @@ export type NotificationCta =
   | { type: 'view_order'; orderId: string }
   | { type: 'view_portfolio' }
   | { type: 'market_buy'; asset: AssetId; amountAed: number }
-  | { type: 'set_price'; asset: AssetId; side: Side };
+  | { type: 'set_price'; asset: AssetId; side: Side }
+  | { type: 'view_orders'; asset: AssetId };
 
 export interface AppNotification {
   id: string;

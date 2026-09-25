@@ -20,6 +20,10 @@ export function useNotificationAction() {
         setAsset(cta.asset);
         reset('asset', { name: 'buy', asset: cta.asset, tab: 'now', amountAed: cta.amountAed });
         break;
+      case 'view_orders':
+        setAsset(cta.asset);
+        reset('asset', { name: 'orders', asset: cta.asset, tab: 'history' });
+        break;
       case 'set_price':
         setAsset(cta.asset);
         reset('asset', { name: cta.side, asset: cta.asset, tab: 'price' });

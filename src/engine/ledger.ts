@@ -92,19 +92,34 @@ export function reconcileSellCap(ctx: Ctx, asset: AssetId): string[] {
     });
     total -= o.grams ?? 0;
     cancelled.push(o.id);
-    notify(ctx, {
-      kind: 'auto_cancelled',
-      title: COPY.notif.autoTitle,
-      body: COPY.notif.autoBody(asset, o.limitPrice, o.grams ?? 0),
-      asset,
-      orderId: o.id,
-      cta: { type: 'set_price', asset, side: 'sell', label: COPY.notif.ctaSetPrice },
-    });
   }
   if (cancelled.length) {
+    notifyCancelledBatch(ctx, asset, cancelled, 'auto');
     log(ctx, 'demo', `Sell cap: holdings ${holdings.toFixed(4)} g < orders → auto-cancelled newest first: ${cancelled.join(', ')}`);
   }
   return cancelled;
+}
+
+/**
+ * One toast + inbox item for all orders cancelled by a single user action,
+ * listing each order. `reason` picks the explanation line.
+ */
+export function notifyCancelledBatch(ctx: Ctx, asset: AssetId, ids: string[], reason: 'auto' | 'replace'): void {
+  if (ids.length === 0) return;
+  const orders = ids.map(id => findOrder(ctx.s, id)!);
+  notify(ctx, {
+    kind: reason === 'auto' ? 'auto_cancelled' : 'cancelled',
+    title: COPY.notif.batchTitle(orders.length),
+    body: [
+      reason === 'auto' ? COPY.notif.batchReasonAuto(asset) : COPY.notif.batchReasonReplace(asset),
+      ...orders.map(o => COPY.notif.batchLine(o.asset, o.grams ?? 0, o.limitPrice)),
+    ].join('\n'),
+    asset,
+    orderId: orders.length === 1 ? orders[0].id : undefined,
+    cta: orders.length === 1
+      ? { type: 'view_order', orderId: orders[0].id, label: COPY.notif.ctaViewOrder }
+      : { type: 'view_orders', asset, label: COPY.notif.ctaViewCancelled },
+  });
 }
 
 /** EXPIRED transitions and the one-time "ends in 24h" warning. */

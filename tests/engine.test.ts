@@ -27,6 +27,8 @@ const st = (s: AppState, id: string) => s.orders.find(o => o.id === id)!.status;
   const f = s.orders.find(o => o.id === 'A')!.fill!;
   ok(f.favourable && f.slippageBps < 0, `fill recorded: price ${f.price} limit ${f.limit} bps ${f.slippageBps.toFixed(1)} aed ${f.slippageAed.toFixed(3)}`);
   ok(s.notifications.some(n => n.kind === 'failed' && n.cta?.type === 'market_buy' && n.cta.amountAed === 100), 'FAILED notif → prefilled market buy');
+  const filled = s.notifications.find(n => n.kind === 'filled')!;
+  ok(/^Gold bought at AED [\d,.]+\/g \(your price AED [\d,.]+\/g\)$/.test(filled.title) && !/at your price/.test(filled.title + filled.body), `fill notification: "${filled.title}"`);
   ok(s.orders.find(o => o.id === 'A')!.timeline.map(t => t.status).join('>') === 'DRAFT>OPEN>TRIGGERED>FILLED', 'timeline DRAFT>OPEN>TRIGGERED>FILLED');
 }
 // 2. LIFO
@@ -37,17 +39,33 @@ const st = (s: AppState, id: string) => s.orders.find(o => o.id === id)!.status;
   s = run(s, { type: 'MARKET_SELL', tradeId: 'T1', asset: 'gold', grams: 1.2, realNow: T });
   ok(st(s, 'S1') === 'OPEN' && st(s, 'S2') === 'AUTO_CANCELLED' && st(s, 'S3') === 'AUTO_CANCELLED', 'LIFO: newest two auto-cancelled, oldest kept');
   ok(s.trades[0].cancelledOrderIds.join() === 'S3,S2', 'trade lists cancelled newest first');
-  ok(s.notifications.filter(n => n.kind === 'auto_cancelled').length === 2, '2 auto-cancel notifications');
+  ok(s.notifications.filter(n => n.kind === 'auto_cancelled').length === 1, 'auto-cancels batched into 1 notification');
 }
-// 2b. "Cancel them and sell all"
+// 2b. "Cancel them and sell all" — staged on the ticket, applied only on placement
 {
+  const specs = ['K1', 'K2'].map(id => ({ id, asset: 'gold' as const, side: 'sell' as const, offset: 0.05, grams: 0.5, validityDays: 7 }));
   let s = run(initialState(T),
-    { type: 'DEMO_INJECT_ORDERS', realNow: T, specs: ['K1', 'K2'].map(id => ({ id, asset: 'gold' as const, side: 'sell' as const, offset: 0.05, grams: 0.5, validityDays: 7 })) },
-    { type: 'DEMO_INJECT_ORDERS', realNow: T, specs: [{ id: 'KS', asset: 'silver', side: 'sell', offset: 0.05, grams: 5, validityDays: 7 }] },
-    { type: 'CANCEL_SELL_ORDERS', asset: 'gold', realNow: T });
-  ok(st(s, 'K1') === 'CANCELLED' && st(s, 'K2') === 'CANCELLED' && st(s, 'KS') === 'OPEN', 'cancel-all: only this asset\'s sell orders cancelled');
-  ok(s.notifications.filter(n => n.kind === 'cancelled').length === 2, 'cancel-all: one notification per order');
-  ok(validateTicket(s, { asset: 'gold', side: 'sell', limitPrice: 9999, amountAed: NaN, grams: 2 }).ok, 'cancel-all: full holdings now allowed');
+    { type: 'DEMO_INJECT_ORDERS', realNow: T, specs },
+    { type: 'DEMO_INJECT_ORDERS', realNow: T, specs: [{ id: 'KS', asset: 'silver', side: 'sell', offset: 0.05, grams: 5, validityDays: 7 }] });
+  const sellAll = { asset: 'gold' as const, side: 'sell' as const, limitPrice: 9999, grams: 2, validityDays: 7 };
+  ok(!validateTicket(s, { ...sellAll, amountAed: NaN }).ok, 'sell-all blocked without the replace flag');
+  ok(validateTicket(s, { ...sellAll, amountAed: NaN, replaceSellOrders: true }).ok, 'sell-all valid with the replace flag (nothing cancelled yet)');
+  ok(st(s, 'K1') === 'OPEN' && st(s, 'K2') === 'OPEN', 'staging alone cancels nothing');
+  s = run(s, { type: 'PLACE_ORDER', orderId: 'NEW', realNow: T, draft: { ...sellAll, replaceSellOrders: true } });
+  ok(st(s, 'K1') === 'CANCELLED' && st(s, 'K2') === 'CANCELLED' && st(s, 'KS') === 'OPEN' && st(s, 'NEW') === 'OPEN', 'on placement: gold sells cancelled, silver kept, new order open');
+  const batch = s.notifications.filter(n => n.kind === 'cancelled');
+  ok(batch.length === 1 && batch[0].title === '2 price orders cancelled' && batch[0].body.split('\n').length === 3, 'one batched notification listing both orders');
+  // a rejected placement (price now invalid) must not cancel anything
+  let s2 = run(initialState(T), { type: 'DEMO_INJECT_ORDERS', realNow: T, specs });
+  s2 = run(s2, { type: 'PLACE_ORDER', orderId: 'BAD', realNow: T, draft: { ...sellAll, limitPrice: 1, replaceSellOrders: true } });
+  ok(st(s2, 'K1') === 'OPEN' && !s2.orders.some(o => o.id === 'BAD'), 'rejected placement cancels nothing');
+}
+// 2c. LIFO auto-cancel is batched into one notification
+{
+  let s = run(initialState(T), { type: 'DEMO_INJECT_ORDERS', realNow: T, specs: ['L1', 'L2', 'L3'].map((id, i) => ({ id, asset: 'gold' as const, side: 'sell' as const, offset: 0.03, grams: 0.5, validityDays: 7, createdAgoMs: (3 - i) * 1000 })) });
+  s = run(s, { type: 'MARKET_SELL', tradeId: 'TT', asset: 'gold', grams: 1.2, realNow: T });
+  const n = s.notifications.filter(x => x.kind === 'auto_cancelled');
+  ok(n.length === 1 && n[0].title === '2 price orders cancelled' && n[0].cta?.type === 'view_orders', 'LIFO: one batched notification for 2 orders');
 }
 // 3. Expiry
 {
