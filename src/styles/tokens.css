@@ -1,0 +1,49 @@
+/* ── Design tokens ────────────────────────────────────────────────────────────
+   Swap brand colours here. Everything in the phone reads from these variables.
+   Scheme follows the Botim Money / OGold prototypes (botim_physical_delivery). */
+:root {
+  /* Brand */
+  --brand:          #1A4FDB;
+  --brand-strong:   #1440B8;
+  --brand-soft:     #EEF3FF;
+  --brand-deep:     #0B1F5B;
+  --brand-shadow:   rgba(26, 79, 219, 0.30);
+  --brand-gold:     #C8971F;
+  --brand-gold-lt:  #F5A623;
+  --brand-gold-bg:  #FEF3C7;
+
+  /* Per-asset page tints */
+  --tint-gold:      #FFF8F0;
+  --tint-silver:    #F3F6FF;
+
+  /* Semantic */
+  --green:     #15803D;
+  --green-bg:  #F0FDF4;
+  --green-bd:  #BBF7D0;
+  --red:       #DC2626;
+  --red-bg:    #FEF2F2;
+  --red-bd:    #FECACA;
+  --amber:     #B45309;
+  --amber-bg:  #FFFBEB;
+  --amber-bd:  #FDE68A;
+  --grey-bg:   #F3F4F6;
+
+  /* Neutrals */
+  --page:        #C9C5BF;
+  --screen-bg:   #F7F8FA;
+  --text:        #111827;
+  --text-2:      #374151;
+  --muted:       #6B7280;
+  --faint:       #9CA3AF;
+  --border:      #E5E7EB;
+  --border-lt:   #F3F4F6;
+  --card:        #FFFFFF;
+  --card-shadow: 0 1px 6px rgba(0, 0, 0, 0.06);
+  --phone-border:#1A1A1A;
+
+  /* Shape */
+  --radius-card: 20px;
+  --radius-btn:  14px;
+  --radius-field:14px;
+  --tap:         48px;
+}

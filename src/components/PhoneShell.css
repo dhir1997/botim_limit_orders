@@ -1,0 +1,64 @@
+.phone {
+  width: 390px;
+  height: 844px;
+  border-radius: 50px;
+  border: 10px solid var(--phone-border);
+  position: relative;
+  overflow: hidden;
+  flex-shrink: 0;
+  background: var(--screen-bg);
+  display: flex;
+  flex-direction: column;
+  box-shadow:
+    0 28px 72px rgba(0, 0, 0, 0.38),
+    0 0 0 1px rgba(255, 255, 255, 0.07);
+  transition: background 0.3s;
+}
+
+.phone__notch {
+  position: absolute;
+  top: 0;
+  left: 50%;
+  transform: translateX(-50%);
+  width: 120px;
+  height: 30px;
+  background: var(--phone-border);
+  border-radius: 0 0 20px 20px;
+  z-index: 99;
+}
+
+.phone--dark .status-bar { color: #fff; }
+.phone--dark .phone__home { background: rgba(255, 255, 255, 0.5); }
+
+.phone__viewport {
+  flex: 1;
+  min-height: 0;
+  position: relative;
+  display: flex;
+  flex-direction: column;
+}
+
+.phone__home {
+  position: absolute;
+  bottom: 7px;
+  left: 50%;
+  transform: translateX(-50%);
+  width: 120px;
+  height: 4px;
+  border-radius: 4px;
+  background: rgba(17, 24, 39, 0.28);
+  z-index: 98;
+  pointer-events: none;
+}
+
+/* On a real phone-sized browser, drop the bezel and fill the screen. */
+@media (max-width: 440px) {
+  .phone {
+    width: 100vw;
+    height: 100dvh;
+    border: none;
+    border-radius: 0;
+    box-shadow: none;
+  }
+  .phone__notch { display: none; }
+}
